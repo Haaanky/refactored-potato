@@ -9,84 +9,56 @@
 ## PROJECT MANIFEST
 
 ```yaml
-# Filled automatically by /init-project on first session.
-# Do NOT edit field names. Set values to ~ (null) to trigger re-detection.
-status: complete   # pending | complete
+status: complete
 
 # ── Identity ──────────────────────────────────────────────────────────────────
-# detect: basename $PWD  OR  jq -r '.name' package.json  OR  grep 'config/name' project.godot
 name: refactored-potato
-
-# detect: jq -r '.description' package.json  OR  head -2 README.md | tail -1
-description: ~
-
-# detect: presence of package.json → Node/TypeScript, project.godot → GDScript/Godot,
-#         requirements.txt → Python, Cargo.toml → Rust, go.mod → Go, pom.xml → Java
+description: TV-serie Händelselogg — shared real-time event counter for TV-show watch groups
 language: TypeScript/JavaScript
-
-# detect: node --version / python --version / godot --version / rustc --version
 runtime_version: v22.22.2
-
-# detect: package-lock.json → npm, yarn.lock → yarn, pnpm-lock.yaml → pnpm,
-#         uv.lock → uv, Pipfile.lock → pipenv
 package_manager: npm
 
 # ── Testing ───────────────────────────────────────────────────────────────────
-# detect: jq '.devDependencies | keys' package.json → look for playwright, jest, vitest, mocha;
-#         ls addons/ in Godot → gut; grep -r 'import pytest' tests/
 test_framework: Vitest
-
-# detect: jq -r '.scripts.test' package.json  OR
-#         check playwright.config.* → "npx playwright test"  OR
-#         check gut_cmdln.gd → "godot --headless -s addons/gut/gut_cmdln.gd ..."
 test_command: npx vitest run
-
-# detect: ls -d tests/ __tests__/ spec/ e2e/ test/ 2>/dev/null | head -5
 test_paths: src
 
 # ── CI / CD ───────────────────────────────────────────────────────────────────
-# detect: ls .github/workflows/ → read each file, extract name + on: trigger + jobs keys
 ci_workflows:
   - file: ci.yml
     trigger: pull_request
-    purpose: ~
+    purpose: lint + test + build; deploys PR preview to gh-pages branch via rossjrw/pr-preview-action
   - file: deploy.yml
-    trigger: push
-    purpose: ~
-  # - file: ~       # e.g. deploy.yml
-  #   trigger: ~    # e.g. push to main
-  #   purpose: ~    # e.g. build + deploy to GitHub Pages
+    trigger: push to main
+    purpose: test + build + deploy production to gh-pages branch via peaceiris/actions-gh-pages
 
-# detect: presence of vercel.json → Vercel, fly.toml → Fly.io, netlify.toml → Netlify,
-#         gh-pages branch or pages: in workflow → GitHub Pages, Dockerfile → container
 deploy_platform: GitHub Pages
-
-# detect: read workflow file deploy step for URL output  OR  CNAME file  OR  README
 production_url: https://haaanky.github.io/refactored-potato/
-
-# detect: read pr-preview or preview workflow for URL construction pattern
-preview_url_pattern: ~
-
-# default unless a workflow or branch protection rule says otherwise
+preview_url_pattern: https://haaanky.github.io/refactored-potato/pr-preview/pr-<N>/
 branch_base: main
 
 # ── Constraints ───────────────────────────────────────────────────────────────
-# Populated during init or as new limitations are discovered in later sessions.
-# Format: "symptom — root cause — fix/workaround"
-# Examples from real projects:
-#   - "Task Scheduler install fails silently — requires admin terminal — user must run:
-#      .venv\Scripts\python.exe -m scheduler.task_scheduler install (as Administrator)"
-#   - "HTTPS proxy in CI blocks Chromium — do not run playwright locally inside Claude cloud"
-#   - "call_deferred() required for scene changes — silent failure in Godot exported builds"
-known_limitations: []
-  # - ~
+known_limitations:
+  - "@astrojs/svelte requires TypeScript ^5.x — do not upgrade to TS 6.x on the Astro branch"
+  - "Astro base path is read from ASTRO_BASE env var at build time; PR builds set this to
+     /refactored-potato/pr-preview/pr-<N>/, production omits it (defaults in astro.config.mjs)"
+  - "Supabase client is nullable on the Astro branch — env vars are optional for builds;
+     the app renders a 'not configured' banner when VITE_SUPABASE_* are absent"
 
-# Files that must be read at every session start (beyond CLAUDE.md itself).
-# detect: look for AI_BACKENDS.md, ASSET_POLICY.md, CONTRIBUTING.md, ARCHITECTURE.md, ADMIN.md
-# ADMIN.md — if present, always include: contains elevated commands for Task Scheduler etc.
 companion_reads: []
-  # - ~
 ```
+
+---
+
+## Branches
+
+| Branch | Stack | Notes |
+|--------|-------|-------|
+| `main` | React 19 + Vite 8 + localStorage | original prototype |
+| `claude/tv-series-event-logger-X9V1s` | React 19 + Vite 8 + Supabase | adds rooms + Realtime to React app |
+| `claude/astro-svelte-variant-P4w9` | **Astro 5 + Svelte 5 + Supabase** | spec-compliant rebuild from scratch |
+
+The Astro branch is the intended production branch. Merge it to `main` when ready.
 
 ---
 
@@ -94,17 +66,38 @@ companion_reads: []
 
 ### Node / TypeScript
 
-- Environment variables must be declared before use; assert non-empty at startup — never call a client with empty credentials
 - Package manager: `npm` — use it consistently, do not mix with others
-- Test framework: Vitest — tests in `src`; run with: `npx vitest run`
+- Test framework: Vitest — tests in `src/test`; run with: `npx vitest run`
+
+### Supabase (Astro branch)
+
+- The client in `src/lib/supabase.ts` is **nullable** — exports `supabase` (null when env vars absent) and `isSupabaseConfigured` (boolean)
+- Every function in `roomStore.ts` must guard with `if (!supabase) return null/false/empty` before any DB call
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are only required for production; PR/preview builds succeed without them
+- Never hardcode placeholder credential values in CI — leave the env block empty and let the app degrade gracefully
+
+### Astro + Svelte (Astro branch)
+
+- `output: 'static'` — no server runtime; everything is pre-rendered + client-side islands
+- Interactive components use `client:load` directive in `.astro` pages
+- Svelte 5 runes syntax (`$state`, `$derived`, `$props`) — not Svelte 4 stores
+- Base path is controlled via `ASTRO_BASE` env var in `astro.config.mjs`; do not hardcode it in components
+- TypeScript must stay at `~5.7.x` — `@astrojs/svelte` peer dep does not support TS 6.x yet
+
+### Deploy / Preview
+
+- Both production and preview write to the `gh-pages` branch (not `upload-pages-artifact`)
+- Production uses `peaceiris/actions-gh-pages` with `keep_files: true` to preserve live PR previews
+- PR previews use `rossjrw/pr-preview-action`; cleanup is automatic on PR close
+- GitHub Pages must be configured to serve from the `gh-pages` branch
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as GitHub repo secrets for production deploy
+
+---
+
 ## Session Notes
 
-> Append discoveries here during a session so future sessions benefit.
-> Format: `YYYY-MM-DD — <note>`. Keep entries short and factual.
-> Remove entries older than ~30 days that are no longer relevant.
-
-<!-- SESSION_NOTES_PLACEHOLDER -->
-
-## Session Notes
+> Format: `YYYY-MM-DD — <note>`. Remove entries older than ~30 days.
 
 2026-04-23 — Initial setup: React 19 + Vite 8 + Tailwind v4 + Vitest 4. Data model is pure functions over an AppState object; localStorage is the only persistence. `vite.config.ts` uses `vitest/config` import (not `vite`) to avoid TS error on the `test` field. `base` is `/refactored-potato/` for GitHub Pages sub-path routing.
+
+2026-04-23 — Created Astro + Svelte 5 + Supabase variant on `claude/astro-svelte-variant-P4w9` from scratch. Season entity removed from DB schema — seasons are derived from `episode.season` integer (matches spec). Supabase client made nullable so builds work without secrets; app shows 'not configured' banner instead of crashing. PR preview deploy via `rossjrw/pr-preview-action` with per-PR base path baked in at build time via `ASTRO_BASE` env var.
