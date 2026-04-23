@@ -11,11 +11,11 @@
 ```yaml
 # Filled automatically by /init-project on first session.
 # Do NOT edit field names. Set values to ~ (null) to trigger re-detection.
-status: pending   # pending | complete
+status: complete   # pending | complete
 
 # ── Identity ──────────────────────────────────────────────────────────────────
 # detect: basename $PWD  OR  jq -r '.name' package.json  OR  grep 'config/name' project.godot
-name: ~
+name: refactored-potato
 
 # detect: jq -r '.description' package.json  OR  head -2 README.md | tail -1
 description: ~
@@ -89,10 +89,10 @@ companion_reads: []
 > This section is written by `/init-project` after detecting the stack.
 > If blank, run `/init-project` first.
 
-<!-- STACK_RULES_PLACEHOLDER -->
+### Stack not detected
 
----
-
+Run `/init-project` or `bash .claude/scripts/detect.sh` to detect the stack.
+Then run `bash .claude/scripts/init.sh` to populate this section.
 ## Session Notes
 
 > Append discoveries here during a session so future sessions benefit.
