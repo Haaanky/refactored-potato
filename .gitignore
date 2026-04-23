@@ -1,0 +1,23 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Secrets — never commit these
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Claude Code — machine-local tool approvals (developer-specific, not shared)
+.claude/settings.local.json
+
+# Python
+config.toml
+.venv/
+__pycache__/
+*.py[cod]
