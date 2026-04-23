@@ -49,8 +49,22 @@ known_limitations:
      app renders a 'not configured' banner when absent"
   - "GitHub Pages must be configured to serve from the gh-pages branch (not upload-pages-artifact)"
 
-companion_reads: []
+# ── Cross-repo coordination ───────────────────────────────────────────────────
+companion_reads:
+  - '.claude/preflight-sync.md'   # cross-repo agent workspace; read at session start
 ```
+
+---
+
+## Cross-Repo Agent Workspace
+
+`.claude/preflight-sync.md` is a structured task file shared between this repo and `haaanky/preflight`.
+Its purpose: record patterns and rules discovered here that need to be propagated to the preflight
+template repo, so a future agent session scoped to `haaanky/preflight` can read the file and
+implement the pending tasks without needing full context from this session.
+
+**Always read it at session start** (it is listed in `companion_reads` above).
+If you resolve a TASK entry, mark it `status: done` in the file and commit the change.
 
 ---
 
@@ -115,3 +129,5 @@ supabase/migrations/001_initial.sql
 ## Session Notes
 
 2026-04-23 — Branch created from scratch (first commit only had LICENSE). Full Astro 5 + Svelte 5 + Supabase rebuild. 19 Vitest tests (pure functions). Preview deploy wired up with per-PR ASTRO_BASE baked into build. Supabase made nullable so secrets are production-only.
+
+2026-04-23 — Created `.claude/preflight-sync.md` as cross-repo agent workspace with 4 pending tasks for `haaanky/preflight`. Added to `companion_reads` so future agents read it at session start.
