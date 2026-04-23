@@ -22,41 +22,47 @@ description: ~
 
 # detect: presence of package.json → Node/TypeScript, project.godot → GDScript/Godot,
 #         requirements.txt → Python, Cargo.toml → Rust, go.mod → Go, pom.xml → Java
-language: ~
+language: TypeScript/JavaScript
 
 # detect: node --version / python --version / godot --version / rustc --version
-runtime_version: ~
+runtime_version: v22.22.2
 
 # detect: package-lock.json → npm, yarn.lock → yarn, pnpm-lock.yaml → pnpm,
 #         uv.lock → uv, Pipfile.lock → pipenv
-package_manager: ~
+package_manager: npm
 
 # ── Testing ───────────────────────────────────────────────────────────────────
 # detect: jq '.devDependencies | keys' package.json → look for playwright, jest, vitest, mocha;
 #         ls addons/ in Godot → gut; grep -r 'import pytest' tests/
-test_framework: ~
+test_framework: Vitest
 
 # detect: jq -r '.scripts.test' package.json  OR
 #         check playwright.config.* → "npx playwright test"  OR
 #         check gut_cmdln.gd → "godot --headless -s addons/gut/gut_cmdln.gd ..."
-test_command: ~
+test_command: npx vitest run
 
 # detect: ls -d tests/ __tests__/ spec/ e2e/ test/ 2>/dev/null | head -5
-test_paths: ~
+test_paths: src
 
 # ── CI / CD ───────────────────────────────────────────────────────────────────
 # detect: ls .github/workflows/ → read each file, extract name + on: trigger + jobs keys
-ci_workflows: []
+ci_workflows:
+  - file: ci.yml
+    trigger: pull_request
+    purpose: ~
+  - file: deploy.yml
+    trigger: push
+    purpose: ~
   # - file: ~       # e.g. deploy.yml
   #   trigger: ~    # e.g. push to main
   #   purpose: ~    # e.g. build + deploy to GitHub Pages
 
 # detect: presence of vercel.json → Vercel, fly.toml → Fly.io, netlify.toml → Netlify,
 #         gh-pages branch or pages: in workflow → GitHub Pages, Dockerfile → container
-deploy_platform: ~
+deploy_platform: GitHub Pages
 
 # detect: read workflow file deploy step for URL output  OR  CNAME file  OR  README
-production_url: ~
+production_url: https://haaanky.github.io/refactored-potato/
 
 # detect: read pr-preview or preview workflow for URL construction pattern
 preview_url_pattern: ~
@@ -86,13 +92,11 @@ companion_reads: []
 
 ## Stack-Specific Rules
 
-> This section is written by `/init-project` after detecting the stack.
-> If blank, run `/init-project` first.
+### Node / TypeScript
 
-### Stack not detected
-
-Run `/init-project` or `bash .claude/scripts/detect.sh` to detect the stack.
-Then run `bash .claude/scripts/init.sh` to populate this section.
+- Environment variables must be declared before use; assert non-empty at startup — never call a client with empty credentials
+- Package manager: `npm` — use it consistently, do not mix with others
+- Test framework: Vitest — tests in `src`; run with: `npx vitest run`
 ## Session Notes
 
 > Append discoveries here during a session so future sessions benefit.
@@ -100,3 +104,7 @@ Then run `bash .claude/scripts/init.sh` to populate this section.
 > Remove entries older than ~30 days that are no longer relevant.
 
 <!-- SESSION_NOTES_PLACEHOLDER -->
+
+## Session Notes
+
+2026-04-23 — Initial setup: React 19 + Vite 8 + Tailwind v4 + Vitest 4. Data model is pure functions over an AppState object; localStorage is the only persistence. `vite.config.ts` uses `vitest/config` import (not `vite`) to avoid TS error on the `test` field. `base` is `/refactored-potato/` for GitHub Pages sub-path routing.

@@ -1,23 +1,24 @@
-# OS
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
-Thumbs.db
-
-# Editor
-.vscode/settings.json
-.idea/
-
-# Secrets — never commit these
-.env
-.env.local
-.env.*.local
-*.pem
-*.key
-
-# Claude Code — machine-local tool approvals (developer-specific, not shared)
-.claude/settings.local.json
-
-# Python
-config.toml
-.venv/
-__pycache__/
-*.py[cod]
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
