@@ -3,11 +3,18 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: write       # push to gh-pages branch
+  pull-requests: write  # post preview URL comment
 
 jobs:
   test:
     name: Lint · Test · Build
     runs-on: ubuntu-latest
+    # Skip the build/preview on closed PRs — the preview action handles cleanup
+    if: github.event.action != 'closed'
     steps:
       - uses: actions/checkout@v4
 
@@ -23,9 +30,47 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build
+      - name: Build (PR preview base path)
         run: npm run build
         env:
-          # Stub values keep the client initialisation from throwing during CI build
-          VITE_SUPABASE_URL: https://placeholder.supabase.co
-          VITE_SUPABASE_ANON_KEY: placeholder-anon-key
+          ASTRO_BASE: /refactored-potato/pr-preview/pr-${{ github.event.pull_request.number }}/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+
+  preview:
+    name: Deploy preview
+    runs-on: ubuntu-latest
+    needs: [test]
+    # Run on both open (deploy) and closed (cleanup) events
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        if: github.event.action != 'closed'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: github.event.action != 'closed'
+        run: npm ci
+
+      - name: Build for preview
+        if: github.event.action != 'closed'
+        run: npm run build
+        env:
+          ASTRO_BASE: /refactored-potato/pr-preview/pr-${{ github.event.pull_request.number }}/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+
+      - name: Deploy / clean up PR preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: dist
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+          action: auto
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
