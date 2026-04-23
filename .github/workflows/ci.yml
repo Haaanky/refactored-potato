@@ -34,8 +34,7 @@ jobs:
         run: npm run build
         env:
           ASTRO_BASE: /refactored-potato/pr-preview/pr-${{ github.event.pull_request.number }}/
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          # No Supabase secrets needed — the app renders a "not configured" banner
 
   preview:
     name: Deploy preview
@@ -62,8 +61,7 @@ jobs:
         run: npm run build
         env:
           ASTRO_BASE: /refactored-potato/pr-preview/pr-${{ github.event.pull_request.number }}/
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+          # No Supabase secrets needed — the app renders a "not configured" banner
 
       - name: Deploy / clean up PR preview
         uses: rossjrw/pr-preview-action@v1

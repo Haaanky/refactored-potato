@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
+  import { isSupabaseConfigured } from '../lib/supabase'
   import type { AppState, RoomSession, Series, Episode, Season } from '../lib/types'
   import {
     loadRoomData,
@@ -142,7 +143,18 @@
   let newSeriesName = $state('')
 </script>
 
-{#if !session}
+{#if !isSupabaseConfigured}
+  <div class="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div class="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-yellow-300 p-8 text-center">
+      <p class="text-sm font-medium text-yellow-800 mb-2">Supabase ej konfigurerat</p>
+      <p class="text-xs text-gray-500">
+        Sätt <code class="bg-gray-100 px-1 rounded">VITE_SUPABASE_URL</code> och
+        <code class="bg-gray-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> och bygg om.
+      </p>
+    </div>
+  </div>
+
+{:else if !session}
   <RoomGate {onJoined} />
 
 {:else if loading}

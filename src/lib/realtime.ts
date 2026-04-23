@@ -13,6 +13,8 @@ export function subscribeToEvents(
   onEvent: (payload: EventPayload) => void,
   onStatusChange?: (status: string) => void,
 ): () => void {
+  if (!supabase) return () => {}
+
   const channel: RealtimeChannel = supabase
     .channel(`room-events-${roomId}`)
     .on(

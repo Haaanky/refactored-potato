@@ -2,9 +2,13 @@ import { supabase } from './supabase'
 import { mapSeries, mapEpisode, mapEventType, tallyFromEvents } from './store'
 import type { DbRoom, DbEvent, AppState, Series, Episode, EventType } from './types'
 
+// All functions return null / false / empty state when supabase is null
+// (i.e. env vars not set — PR preview builds without secrets).
+
 // ── Room management ───────────────────────────────────────────────────────────
 
 export async function createRoom(slug: string, passwordHash: string): Promise<DbRoom | null> {
+  if (!supabase) return null
   const { data, error } = await supabase
     .from('rooms')
     .insert({ room_slug: slug, password_hash: passwordHash })
@@ -15,6 +19,7 @@ export async function createRoom(slug: string, passwordHash: string): Promise<Db
 }
 
 export async function joinRoom(slug: string, passwordHash: string): Promise<DbRoom | null> {
+  if (!supabase) return null
   const { data, error } = await supabase
     .from('rooms')
     .select()
@@ -28,6 +33,9 @@ export async function joinRoom(slug: string, passwordHash: string): Promise<DbRo
 // ── Data loading ──────────────────────────────────────────────────────────────
 
 export async function loadRoomData(roomId: string): Promise<AppState> {
+  const empty: AppState = { series: [], episodes: [], eventTypes: [], tallies: [] }
+  if (!supabase) return empty
+
   const { data: rawSeries } = await supabase.from('series').select().eq('room_id', roomId)
   const dbSeries = (rawSeries ?? []) as Array<{
     id: string; room_id: string; title: string; created_at: string
@@ -60,6 +68,7 @@ export async function logEvent(
   roomId: string,
   loggedBy: string | null,
 ): Promise<DbEvent | null> {
+  if (!supabase) return null
   const { data, error } = await supabase
     .from('events')
     .insert({ episode_id: episodeId, event_type_id: eventTypeId, room_id: roomId, logged_by: loggedBy, deleted: false })
@@ -74,6 +83,7 @@ export async function undoLastEvent(
   eventTypeId: string,
   roomId: string,
 ): Promise<boolean> {
+  if (!supabase) return false
   const { data: found, error: findErr } = await supabase
     .from('events')
     .select('id')
@@ -95,6 +105,7 @@ export async function undoLastEvent(
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
 export async function createSeries(roomId: string, title: string): Promise<Series | null> {
+  if (!supabase) return null
   const { data, error } = await supabase
     .from('series')
     .insert({ room_id: roomId, title })
@@ -105,6 +116,7 @@ export async function createSeries(roomId: string, title: string): Promise<Serie
 }
 
 export async function deleteSeries(seriesId: string): Promise<boolean> {
+  if (!supabase) return false
   const { error } = await supabase.from('series').delete().eq('id', seriesId)
   return !error
 }
@@ -115,6 +127,7 @@ export async function createEpisode(
   episodeNumber: number,
   title: string,
 ): Promise<Episode | null> {
+  if (!supabase) return null
   const { data, error } = await supabase
     .from('episodes')
     .insert({ series_id: seriesId, season, episode: episodeNumber, title: title || null })
@@ -125,6 +138,7 @@ export async function createEpisode(
 }
 
 export async function createEventType(seriesId: string, label: string): Promise<EventType | null> {
+  if (!supabase) return null
   const { data, error } = await supabase
     .from('event_types')
     .insert({ series_id: seriesId, label })
@@ -135,6 +149,7 @@ export async function createEventType(seriesId: string, label: string): Promise<
 }
 
 export async function deleteEventType(eventTypeId: string): Promise<boolean> {
+  if (!supabase) return false
   const { error } = await supabase.from('event_types').delete().eq('id', eventTypeId)
   return !error
 }
