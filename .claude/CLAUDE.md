@@ -45,8 +45,22 @@ known_limitations:
   - "Supabase client is nullable on the Astro branch — env vars are optional for builds;
      the app renders a 'not configured' banner when VITE_SUPABASE_* are absent"
 
-companion_reads: []
+# ── Cross-repo coordination ───────────────────────────────────────────────────
+companion_reads:
+  - '.claude/preflight-sync.md'   # cross-repo agent workspace; read at session start
 ```
+
+---
+
+## Cross-Repo Agent Workspace
+
+`.claude/preflight-sync.md` is a structured task file shared between this repo and `haaanky/preflight`.
+Its purpose: record patterns and rules discovered here that need to be propagated to the preflight
+template repo, so a future agent session scoped to `haaanky/preflight` can read the file and
+implement the pending tasks without needing full context from this session.
+
+**Always read it at session start** (it is listed in `companion_reads` above).
+If you resolve a TASK entry, mark it `status: done` in the file and commit the change.
 
 ---
 
@@ -101,3 +115,5 @@ The Astro branch is the intended production branch. Merge it to `main` when read
 2026-04-23 — Initial setup: React 19 + Vite 8 + Tailwind v4 + Vitest 4. Data model is pure functions over an AppState object; localStorage is the only persistence. `vite.config.ts` uses `vitest/config` import (not `vite`) to avoid TS error on the `test` field. `base` is `/refactored-potato/` for GitHub Pages sub-path routing.
 
 2026-04-23 — Created Astro + Svelte 5 + Supabase variant on `claude/astro-svelte-variant-P4w9` from scratch. Season entity removed from DB schema — seasons are derived from `episode.season` integer (matches spec). Supabase client made nullable so builds work without secrets; app shows 'not configured' banner instead of crashing. PR preview deploy via `rossjrw/pr-preview-action` with per-PR base path baked in at build time via `ASTRO_BASE` env var.
+
+2026-04-23 — Created `.claude/preflight-sync.md` as cross-repo agent workspace with 4 pending tasks for `haaanky/preflight`. Added to `companion_reads` so future agents read it at session start.
