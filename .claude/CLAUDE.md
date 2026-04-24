@@ -12,8 +12,8 @@
 status: complete
 
 # ── Identity ──────────────────────────────────────────────────────────────────
-name: refactored-potato
-description: TV-serie Händelselogg — shared real-time event counter for TV-show watch groups
+name: tv-series-event-logger (Astro variant)
+description: TV-serie Händelselogg — Astro 5 + Svelte 5 + Supabase, rebuilt from scratch per spec
 language: TypeScript/JavaScript
 runtime_version: v22.22.2
 package_manager: npm
@@ -21,29 +21,33 @@ package_manager: npm
 # ── Testing ───────────────────────────────────────────────────────────────────
 test_framework: Vitest
 test_command: npx vitest run
-test_paths: src
+test_paths: src/test
+# Note: only pure-function tests exist (crypto, store helpers).
+# Svelte component tests not yet written — add @testing-library/svelte when needed.
 
 # ── CI / CD ───────────────────────────────────────────────────────────────────
 ci_workflows:
   - file: ci.yml
     trigger: pull_request
-    purpose: lint + test + build; deploys PR preview to gh-pages branch via rossjrw/pr-preview-action
+    purpose: test + build with PR-specific ASTRO_BASE; deploys preview to gh-pages via rossjrw/pr-preview-action; cleans up on PR close
   - file: deploy.yml
     trigger: push to main
-    purpose: test + build + deploy production to gh-pages branch via peaceiris/actions-gh-pages
+    purpose: test + build production (no ASTRO_BASE set); deploys to gh-pages via peaceiris/actions-gh-pages with keep_files:true
 
-deploy_platform: GitHub Pages
+deploy_platform: GitHub Pages (gh-pages branch)
 production_url: https://haaanky.github.io/refactored-potato/
 preview_url_pattern: https://haaanky.github.io/refactored-potato/pr-preview/pr-<N>/
 branch_base: main
 
 # ── Constraints ───────────────────────────────────────────────────────────────
 known_limitations:
-  - "@astrojs/svelte requires TypeScript ^5.x — do not upgrade to TS 6.x on the Astro branch"
-  - "Astro base path is read from ASTRO_BASE env var at build time; PR builds set this to
-     /refactored-potato/pr-preview/pr-<N>/, production omits it (defaults in astro.config.mjs)"
-  - "Supabase client is nullable on the Astro branch — env vars are optional for builds;
-     the app renders a 'not configured' banner when VITE_SUPABASE_* are absent"
+  - "TypeScript must stay at ~5.7.x — @astrojs/svelte peer dep declares ^5.3.3 and rejects TS 6.x"
+  - "Astro base path is read from ASTRO_BASE env var at build time (astro.config.mjs);
+     PR builds set ASTRO_BASE=/refactored-potato/pr-preview/pr-<N>/;
+     production omits it and the default /refactored-potato/ is used"
+  - "Supabase client is nullable — VITE_SUPABASE_* are not required for CI/preview builds;
+     app runs in demo mode with mock data when absent"
+  - "GitHub Pages must be configured to serve from the gh-pages branch (not upload-pages-artifact)"
 
 # ── Cross-repo coordination ───────────────────────────────────────────────────
 companion_reads:
@@ -64,56 +68,74 @@ If you resolve a TASK entry, mark it `status: done` in the file and commit the c
 
 ---
 
-## Branches
+## Architecture
 
-| Branch | Stack | Notes |
-|--------|-------|-------|
-| `main` | React 19 + Vite 8 + localStorage | original prototype |
-| `claude/tv-series-event-logger-X9V1s` | React 19 + Vite 8 + Supabase | adds rooms + Realtime to React app |
-| `claude/astro-svelte-variant-P4w9` | **Astro 5 + Svelte 5 + Supabase** | spec-compliant rebuild from scratch |
+```
+src/
+├── lib/
+│   ├── types.ts        # domain + DB row types
+│   ├── crypto.ts       # sha256() via Web Crypto API
+│   ├── supabase.ts     # nullable client + isSupabaseConfigured flag
+│   ├── mockData.ts     # mock RoomSession + AppState for demo mode
+│   ├── store.ts        # pure helpers: getSeasons, tallyFromEvents, patchIncrement, …
+│   ├── roomStore.ts    # Supabase CRUD: createRoom, joinRoom, loadRoomData, logEvent, …
+│   └── realtime.ts     # subscribeToEvents, applyEventPayload
+├── components/
+│   ├── App.svelte      # root island — session state, all handlers, layout
+│   ├── RoomGate.svelte # join/create room form; hashes password with sha256
+│   ├── EpisodeView.svelte
+│   ├── EventCounter.svelte
+│   └── StatsView.svelte
+├── layouts/Base.astro
+├── pages/index.astro   # single page, renders <App client:load />
+├── styles/global.css   # @import "tailwindcss"
+└── test/
+    ├── crypto.test.ts
+    └── store.test.ts
+supabase/migrations/001_initial.sql
+```
 
-The Astro branch is the intended production branch. Merge it to `main` when ready.
+**Key data-model decision:** No `seasons` DB table. The `episodes` table stores `season` as an integer. `Season` objects are derived client-side via `getSeasons(state, seriesId)` with deterministic IDs (`${seriesId}-s${number}`).
 
 ---
 
 ## Stack-Specific Rules
 
-### Node / TypeScript
+### Supabase
 
-- Package manager: `npm` — use it consistently, do not mix with others
-- Test framework: Vitest — tests in `src/test`; run with: `npx vitest run`
+- `supabase.ts` exports `supabase` (null when env vars absent) and `isSupabaseConfigured`
+- Every function in `roomStore.ts` starts with `if (!supabase) return <mock-or-empty>`
+- `realtime.ts` `subscribeToEvents` returns `() => {}` no-op when supabase is null
+- **Demo mode**: when `!isSupabaseConfigured`, the app auto-sessions with `mockSession`
+  and loads `getMockAppState()` from `src/lib/mockData.ts`; all CRUD functions return
+  generated in-memory objects so the full UI is interactive without credentials
+- A slim banner (`Demo-läge — data sparas inte`) is shown instead of an error screen
+- Mock data lives exclusively in `src/lib/mockData.ts` — never scatter fake values in
+  production code paths
+- **Never** add placeholder credentials to CI — leave the env block empty
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as GitHub repo Secrets (production only)
 
-### Supabase (Astro branch)
+### Astro + Svelte 5
 
-- The client in `src/lib/supabase.ts` is **nullable** — exports `supabase` (null when env vars absent) and `isSupabaseConfigured` (boolean)
-- Every function in `roomStore.ts` must guard with `if (!supabase) return null/false/empty` before any DB call
-- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are only required for production; PR/preview builds succeed without them
-- Never hardcode placeholder credential values in CI — leave the env block empty and let the app degrade gracefully
+- `output: 'static'` — pre-rendered HTML + client-side islands only
+- All interactive components use `client:load` in `.astro` pages
+- Use Svelte 5 runes (`$state`, `$derived`, `$props`) — not Svelte 4 stores
+- Base path via `ASTRO_BASE` env var — never hardcode it inside components
+- TypeScript `~5.7.x` — do not bump to 6.x
 
-### Astro + Svelte (Astro branch)
+### Deploy
 
-- `output: 'static'` — no server runtime; everything is pre-rendered + client-side islands
-- Interactive components use `client:load` directive in `.astro` pages
-- Svelte 5 runes syntax (`$state`, `$derived`, `$props`) — not Svelte 4 stores
-- Base path is controlled via `ASTRO_BASE` env var in `astro.config.mjs`; do not hardcode it in components
-- TypeScript must stay at `~5.7.x` — `@astrojs/svelte` peer dep does not support TS 6.x yet
-
-### Deploy / Preview
-
-- Both production and preview write to the `gh-pages` branch (not `upload-pages-artifact`)
-- Production uses `peaceiris/actions-gh-pages` with `keep_files: true` to preserve live PR previews
-- PR previews use `rossjrw/pr-preview-action`; cleanup is automatic on PR close
-- GitHub Pages must be configured to serve from the `gh-pages` branch
-- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as GitHub repo secrets for production deploy
+- Both prod and preview target the `gh-pages` branch
+- Production: `peaceiris/actions-gh-pages` with `keep_files: true`
+- PR preview: `rossjrw/pr-preview-action`, auto-cleanup on close
+- Changing to `upload-pages-artifact` / `deploy-pages` will break preview URLs
 
 ---
 
 ## Session Notes
 
-> Format: `YYYY-MM-DD — <note>`. Remove entries older than ~30 days.
-
-2026-04-23 — Initial setup: React 19 + Vite 8 + Tailwind v4 + Vitest 4. Data model is pure functions over an AppState object; localStorage is the only persistence. `vite.config.ts` uses `vitest/config` import (not `vite`) to avoid TS error on the `test` field. `base` is `/refactored-potato/` for GitHub Pages sub-path routing.
-
-2026-04-23 — Created Astro + Svelte 5 + Supabase variant on `claude/astro-svelte-variant-P4w9` from scratch. Season entity removed from DB schema — seasons are derived from `episode.season` integer (matches spec). Supabase client made nullable so builds work without secrets; app shows 'not configured' banner instead of crashing. PR preview deploy via `rossjrw/pr-preview-action` with per-PR base path baked in at build time via `ASTRO_BASE` env var.
+2026-04-23 — Branch created from scratch (first commit only had LICENSE). Full Astro 5 + Svelte 5 + Supabase rebuild. 19 Vitest tests (pure functions). Preview deploy wired up with per-PR ASTRO_BASE baked into build. Supabase made nullable so secrets are production-only.
 
 2026-04-23 — Created `.claude/preflight-sync.md` as cross-repo agent workspace with 4 pending tasks for `haaanky/preflight`. Added to `companion_reads` so future agents read it at session start.
+
+2026-04-24 — Demo mode implemented: app is fully interactive when Supabase not configured. Mock data in `src/lib/mockData.ts`; CRUD functions return generated objects; App.svelte auto-sessions with mockSession. TASK-005 added to preflight-sync.md.
