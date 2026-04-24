@@ -66,6 +66,19 @@ implement the pending tasks without needing full context from this session.
 **Always read it at session start** (it is listed in `companion_reads` above).
 If you resolve a TASK entry, mark it `status: done` in the file and commit the change.
 
+### Rule: when to sync a new rule to preflight
+
+Whenever you add or update a rule in any CLAUDE.md in this repo, ask:
+> *Is this pattern general enough to benefit other projects using the preflight template?*
+
+- **Yes → add a TASK** to `.claude/preflight-sync.md` describing what to add/change in `haaanky/preflight`.
+- **No → skip.** Examples of repo-specific rules that should NOT be synced:
+  - Swedish UI text or localisation decisions
+  - Domain-specific data shapes (TV series, episodes, tallies)
+  - Anything referencing this repo by name or its particular file structure
+
+General patterns worth syncing include: CI/CD patterns, nullable client conventions, TypeScript version constraints, deploy strategies, mock/demo mode patterns.
+
 ---
 
 ## Architecture
@@ -138,4 +151,4 @@ supabase/migrations/001_initial.sql
 
 2026-04-23 — Created `.claude/preflight-sync.md` as cross-repo agent workspace with 4 pending tasks for `haaanky/preflight`. Added to `companion_reads` so future agents read it at session start.
 
-2026-04-24 — Demo mode implemented: app is fully interactive when Supabase not configured. Mock data in `src/lib/mockData.ts`; CRUD functions return generated objects; App.svelte auto-sessions with mockSession. TASK-005 added to preflight-sync.md.
+2026-04-24 — Demo mode implemented: app fully interactive without Supabase credentials. TASK-005 added to preflight-sync.md. Added meta-rule: new CLAUDE.md rules should be evaluated for preflight sync.
