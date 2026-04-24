@@ -10,7 +10,7 @@
 
 **Source repo:** `haaanky/refactored-potato`  
 **Target repo:** `haaanky/preflight`  
-**Last updated:** 2026-04-23  
+**Last updated:** 2026-04-24  
 
 ---
 
@@ -88,8 +88,8 @@ completed_at: ~
 The preflight template (and `refactored-potato` main branch CLAUDE.md) contained
 this rule:
 
-> “Environment variables must be declared before use; assert non-empty at startup —
-> never call a client with empty credentials.”
+> "Environment variables must be declared before use; assert non-empty at startup —
+> never call a client with empty credentials."
 
 This rule is correct for production, but **conflicts with preview builds** where
 secrets intentionally do not exist. We learned that making the Supabase client
@@ -183,3 +183,104 @@ preview_url_pattern: ~
 
 Also update `/init-project` skill logic (if applicable) to auto-detect and fill
 this field when `rossjrw/pr-preview-action` is found in a workflow file.
+
+---
+
+## TASK-005 — Demo mode pattern for apps with optional backends
+
+```yaml
+status: pending
+completed_at: ~
+```
+
+### Context
+
+Showing a static "not configured" error screen when env vars are absent is unhelpful
+for preview builds and local development without credentials. We introduced a **demo
+mode** pattern in `refactored-potato` that makes the app fully interactive using
+in-memory mock data when the backend is unconfigured.
+
+### Pattern
+
+**File: `src/lib/mockData.ts`** (new file in the app template)
+
+```typescript
+import type { AppState, RoomSession } from './types'
+
+export const MOCK_ROOM_ID = 'demo-room'
+
+export const mockSession: RoomSession = {
+  room: { id: MOCK_ROOM_ID, room_slug: 'demo', password_hash: '', created_at: '2026-01-01T00:00:00Z' },
+  displayName: 'Demo',
+}
+
+export function getMockAppState(): AppState {
+  return {
+    series: [
+      { id: 'demo-s1', roomId: MOCK_ROOM_ID, name: 'Star Trek: TNG', createdAt: '2026-01-01T00:00:00Z' },
+    ],
+    episodes: [
+      { id: 'demo-e1', seriesId: 'demo-s1', season: 1, number: 1, title: 'Encounter at Farpoint' },
+      { id: 'demo-e2', seriesId: 'demo-s1', season: 1, number: 2, title: 'The Naked Now' },
+    ],
+    eventTypes: [
+      { id: 'demo-et1', seriesId: 'demo-s1', name: 'Catchphrase', emoji: null },
+      { id: 'demo-et2', seriesId: 'demo-s1', name: 'Plot hole', emoji: null },
+    ],
+    tallies: [
+      { episodeId: 'demo-e1', eventTypeId: 'demo-et1', count: 3 },
+      { episodeId: 'demo-e1', eventTypeId: 'demo-et2', count: 1 },
+    ],
+  }
+}
+```
+
+**`src/lib/roomStore.ts`** — CRUD functions return generated objects in demo mode:
+
+```typescript
+import { getMockAppState } from './mockData'
+
+// loadRoomData
+if (!supabase) return getMockAppState()
+
+// createSeries
+if (!supabase) return { id: crypto.randomUUID(), roomId, name: title, createdAt: new Date().toISOString() }
+
+// createEpisode
+if (!supabase) return { id: crypto.randomUUID(), seriesId, season, number: episodeNumber, title: title || '' }
+
+// createEventType
+if (!supabase) return { id: crypto.randomUUID(), seriesId, name: label, emoji: null }
+```
+
+**Root component (e.g. `App.svelte`)** — auto-session and demo banner:
+
+```svelte
+// Initialise with mock data when backend not configured
+let session = $state(isSupabaseConfigured ? null : mockSession)
+let appState = $state(isSupabaseConfigured ? emptyState : getMockAppState())
+
+// In template: skip auth gate, show slim demo banner
+{#if !isSupabaseConfigured}
+  <div class="demo-banner">Demo-läge — data sparas inte, återställs vid omladdning</div>
+{/if}
+```
+
+### What to add to the preflight template
+
+**File: `CLAUDE.md` Supabase rules section**
+
+Add after the nullable client rules:
+
+```markdown
+- When `!isSupabaseConfigured`, load mock data and auto-session instead of showing
+  an error screen; all CRUD functions must return generated in-memory objects so
+  the full UI is testable without credentials.
+- Keep mock data in a dedicated `src/lib/mockData.ts`; never scatter fake values
+  through production code paths.
+```
+
+**File: `templates/astro/src/lib/mockData.ts`**
+
+Add a template file (with `{{PLACEHOLDER}}` tokens where needed) following the
+pattern above.
