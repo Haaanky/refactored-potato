@@ -43,7 +43,7 @@ known_limitations:
   - "Astro base path is read from ASTRO_BASE env var at build time; PR builds set this to
      /refactored-potato/pr-preview/pr-<N>/, production omits it (defaults in astro.config.mjs)"
   - "Supabase client is nullable on the Astro branch — env vars are optional for builds;
-     the app renders a 'not configured' banner when VITE_SUPABASE_* are absent"
+     the app runs in demo mode with mock data when VITE_SUPABASE_* are absent"
 
 # ── Cross-repo coordination ───────────────────────────────────────────────────
 companion_reads:
@@ -61,6 +61,19 @@ implement the pending tasks without needing full context from this session.
 
 **Always read it at session start** (it is listed in `companion_reads` above).
 If you resolve a TASK entry, mark it `status: done` in the file and commit the change.
+
+### Rule: when to sync a new rule to preflight
+
+Whenever you add or update a rule in any CLAUDE.md in this repo, ask:
+> *Is this pattern general enough to benefit other projects using the preflight template?*
+
+- **Yes → add a TASK** to `.claude/preflight-sync.md` describing what to add/change in `haaanky/preflight`.
+- **No → skip.** Examples of repo-specific rules that should NOT be synced:
+  - Swedish UI text or localisation decisions
+  - Domain-specific data shapes (TV series, episodes, tallies)
+  - Anything referencing this repo by name or its particular file structure
+
+General patterns worth syncing include: CI/CD patterns, nullable client conventions, TypeScript version constraints, deploy strategies, mock/demo mode patterns.
 
 ---
 
@@ -86,7 +99,8 @@ The Astro branch is the intended production branch. Merge it to `main` when read
 ### Supabase (Astro branch)
 
 - The client in `src/lib/supabase.ts` is **nullable** — exports `supabase` (null when env vars absent) and `isSupabaseConfigured` (boolean)
-- Every function in `roomStore.ts` must guard with `if (!supabase) return null/false/empty` before any DB call
+- Every function in `roomStore.ts` must guard with `if (!supabase) return <mock-or-empty>` before any DB call
+- When `!isSupabaseConfigured`, the app runs in demo mode: auto-session with `mockSession`, mock `AppState` from `getMockAppState()`, all CRUD returns generated in-memory objects
 - `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are only required for production; PR/preview builds succeed without them
 - Never hardcode placeholder credential values in CI — leave the env block empty and let the app degrade gracefully
 
@@ -117,3 +131,5 @@ The Astro branch is the intended production branch. Merge it to `main` when read
 2026-04-23 — Created Astro + Svelte 5 + Supabase variant on `claude/astro-svelte-variant-P4w9` from scratch. Season entity removed from DB schema — seasons are derived from `episode.season` integer (matches spec). Supabase client made nullable so builds work without secrets; app shows 'not configured' banner instead of crashing. PR preview deploy via `rossjrw/pr-preview-action` with per-PR base path baked in at build time via `ASTRO_BASE` env var.
 
 2026-04-23 — Created `.claude/preflight-sync.md` as cross-repo agent workspace with 4 pending tasks for `haaanky/preflight`. Added to `companion_reads` so future agents read it at session start.
+
+2026-04-24 — Demo mode implemented: app fully interactive without Supabase credentials. TASK-005 added to preflight-sync.md. Added meta-rule: new CLAUDE.md rules should be evaluated for preflight sync.
