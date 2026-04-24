@@ -1,9 +1,10 @@
 import { supabase } from './supabase'
 import { mapSeries, mapEpisode, mapEventType, tallyFromEvents } from './store'
+import { getMockAppState } from './mockData'
 import type { DbRoom, DbEvent, AppState, Series, Episode, EventType } from './types'
 
-// All functions return null / false / empty state when supabase is null
-// (i.e. env vars not set — PR preview builds without secrets).
+// When supabase is null (env vars absent), CRUD functions return generated mock
+// objects so the app remains fully interactive in demo/preview mode.
 
 // ── Room management ───────────────────────────────────────────────────────────
 
@@ -33,8 +34,7 @@ export async function joinRoom(slug: string, passwordHash: string): Promise<DbRo
 // ── Data loading ──────────────────────────────────────────────────────────────
 
 export async function loadRoomData(roomId: string): Promise<AppState> {
-  const empty: AppState = { series: [], episodes: [], eventTypes: [], tallies: [] }
-  if (!supabase) return empty
+  if (!supabase) return getMockAppState()
 
   const { data: rawSeries } = await supabase.from('series').select().eq('room_id', roomId)
   const dbSeries = (rawSeries ?? []) as Array<{
@@ -105,7 +105,7 @@ export async function undoLastEvent(
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
 export async function createSeries(roomId: string, title: string): Promise<Series | null> {
-  if (!supabase) return null
+  if (!supabase) return { id: crypto.randomUUID(), roomId, name: title, createdAt: new Date().toISOString() }
   const { data, error } = await supabase
     .from('series')
     .insert({ room_id: roomId, title })
@@ -127,7 +127,7 @@ export async function createEpisode(
   episodeNumber: number,
   title: string,
 ): Promise<Episode | null> {
-  if (!supabase) return null
+  if (!supabase) return { id: crypto.randomUUID(), seriesId, season, number: episodeNumber, title: title || '' }
   const { data, error } = await supabase
     .from('episodes')
     .insert({ series_id: seriesId, season, episode: episodeNumber, title: title || null })
@@ -138,7 +138,7 @@ export async function createEpisode(
 }
 
 export async function createEventType(seriesId: string, label: string): Promise<EventType | null> {
-  if (!supabase) return null
+  if (!supabase) return { id: crypto.randomUUID(), seriesId, name: label, emoji: null }
   const { data, error } = await supabase
     .from('event_types')
     .insert({ series_id: seriesId, label })

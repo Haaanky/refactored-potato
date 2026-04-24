@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
   import { isSupabaseConfigured } from '../lib/supabase'
+  import { mockSession, getMockAppState } from '../lib/mockData'
   import type { AppState, RoomSession, Series, Episode, Season } from '../lib/types'
   import {
     loadRoomData,
@@ -18,11 +19,11 @@
   import EpisodeView from './EpisodeView.svelte'
   import StatsView from './StatsView.svelte'
 
-  let session = $state<RoomSession | null>(null)
-  let appState = $state<AppState>({ series: [], episodes: [], eventTypes: [], tallies: [] })
+  let session = $state<RoomSession | null>(isSupabaseConfigured ? null : mockSession)
+  let appState = $state<AppState>(isSupabaseConfigured ? { series: [], episodes: [], eventTypes: [], tallies: [] } : getMockAppState())
   let loading = $state(false)
   let realtimeStatus = $state<string>('CONNECTING')
-  let selectedSeriesId = $state<string | null>(null)
+  let selectedSeriesId = $state<string | null>(isSupabaseConfigured ? null : 'demo-s1')
   let openSeasonNumber = $state<number | null>(null)
   let selectedEpisodeId = $state<string | null>(null)
   let activeTab = $state<'track' | 'stats'>('track')
@@ -143,18 +144,7 @@
   let newSeriesName = $state('')
 </script>
 
-{#if !isSupabaseConfigured}
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-    <div class="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-yellow-300 p-8 text-center">
-      <p class="text-sm font-medium text-yellow-800 mb-2">Supabase ej konfigurerat</p>
-      <p class="text-xs text-gray-500">
-        Sätt <code class="bg-gray-100 px-1 rounded">VITE_SUPABASE_URL</code> och
-        <code class="bg-gray-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> och bygg om.
-      </p>
-    </div>
-  </div>
-
-{:else if !session}
+{#if !session}
   <RoomGate {onJoined} />
 
 {:else if loading}
@@ -163,8 +153,15 @@
   </div>
 
 {:else}
+  <!-- Demo mode banner -->
+  {#if !isSupabaseConfigured}
+    <div class="bg-indigo-50 border-b border-indigo-200 text-indigo-700 text-xs text-center py-1 px-4">
+      Demo-läge — data sparas inte, återställs vid omladdning
+    </div>
+  {/if}
+
   <!-- Realtime warning banner -->
-  {#if realtimeStatus !== 'SUBSCRIBED' && realtimeStatus !== 'CONNECTING'}
+  {#if isSupabaseConfigured && realtimeStatus !== 'SUBSCRIBED' && realtimeStatus !== 'CONNECTING'}
     <div class="bg-yellow-50 border-b border-yellow-200 text-yellow-800 text-xs text-center py-1 px-4">
       Realtidsanslutning bruten ({realtimeStatus}) — data kan vara inaktuell
     </div>
