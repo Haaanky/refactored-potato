@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     # Skip the build/preview on closed PRs — the preview action handles cleanup
     if: github.event.action != 'closed'
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
 
@@ -42,6 +44,8 @@ jobs:
     needs: [test]
     # Run on both open (deploy) and closed (cleanup) events
     if: always()
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
 
