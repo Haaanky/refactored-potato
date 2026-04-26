@@ -2,7 +2,7 @@
   import { onDestroy } from 'svelte'
   import { isSupabaseConfigured } from '../lib/supabase'
   import { mockSession, getMockAppState } from '../lib/mockData'
-  import type { AppState, RoomSession, Series, Episode, Season } from '../lib/types'
+  import type { AppState, RoomSession, Series, Season } from '../lib/types'
   import {
     loadRoomData,
     createSeries,
@@ -23,12 +23,14 @@
   let appState = $state<AppState>(isSupabaseConfigured ? { series: [], episodes: [], eventTypes: [], tallies: [] } : getMockAppState())
   let loading = $state(false)
   let realtimeStatus = $state<string>('CONNECTING')
-  let selectedSeriesId = $state<string | null>(isSupabaseConfigured ? null : 'demo-s1')
-  let openSeasonNumber = $state<number | null>(null)
-  let selectedEpisodeId = $state<string | null>(null)
-  let activeTab = $state<'track' | 'stats'>('track')
-  // Tracks seasons created via the + button before any episode is added
-  let pendingSeasonNumbers = $state<number[]>([])
+
+  const nav = $state({
+    selectedSeriesId: isSupabaseConfigured ? null as string | null : 'demo-s1',
+    selectedEpisodeId: null as string | null,
+    openSeasonNumber: null as number | null,
+    activeTab: 'track' as 'track' | 'stats',
+    pendingSeasonNumbers: [] as number[],
+  })
 
   let unsub: (() => void) | null = null
 
@@ -37,7 +39,7 @@
     loading = true
     appState = await loadRoomData(s.room.id)
     loading = false
-    if (appState.series.length > 0) selectedSeriesId = appState.series[0].id
+    if (appState.series.length > 0) nav.selectedSeriesId = appState.series[0].id
 
     unsub = subscribeToEvents(
       s.room.id,
@@ -51,24 +53,29 @@
   // ── Derived ─────────────────────────────────────────────────────────────────
 
   const selectedSeries = $derived(
-    appState.series.find(s => s.id === selectedSeriesId) ?? null,
+    appState.series.find(s => s.id === nav.selectedSeriesId) ?? null,
   )
 
   function allSeasons(series: Series): Season[] {
     const real = getSeasons(appState, series.id).map(s => s.number)
-    const nums = [...new Set([...real, ...pendingSeasonNumbers])].sort((a, b) => a - b)
+    const nums = [...new Set([...real, ...nav.pendingSeasonNumbers])].sort((a, b) => a - b)
     return nums.map(num => ({ id: `${series.id}-s${num}`, seriesId: series.id, number: num }))
   }
 
-  const openSeason = $derived(
-    selectedSeries && openSeasonNumber !== null
-      ? allSeasons(selectedSeries).find(s => s.number === openSeasonNumber) ?? null
-      : null,
-  )
+  // ── Event delegation for nav ──────────────────────────────────────────────
 
-  const selectedEpisode = $derived(
-    appState.episodes.find(e => e.id === selectedEpisodeId) ?? null,
-  )
+  function handleNavClick(e: MouseEvent) {
+    const target = e.target as HTMLElement
+    const epBtn = target.closest('button[data-epid]') as HTMLElement | null
+    const seasonBtn = target.closest('button[data-season]') as HTMLElement | null
+    console.log('NAV', epBtn?.dataset['epid'], seasonBtn?.dataset['season'])
+    if (epBtn?.dataset['epid']) {
+      nav.selectedEpisodeId = epBtn.dataset['epid'] ?? null
+    } else if (seasonBtn?.dataset['season']) {
+      const num = Number(seasonBtn.dataset['season'])
+      nav.openSeasonNumber = nav.openSeasonNumber === num ? null : num
+    }
+  }
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -81,7 +88,7 @@
     const s = await createSeries(session.room.id, name)
     if (s) {
       appState = { ...appState, series: [...appState.series, s] }
-      selectedSeriesId = s.id
+      nav.selectedSeriesId = s.id
       input.value = ''
     }
   }
@@ -94,16 +101,18 @@
       episodes: appState.episodes.filter(e => e.seriesId !== id),
       eventTypes: appState.eventTypes.filter(et => et.seriesId !== id),
     }
-    if (selectedSeriesId === id) {
-      selectedSeriesId = appState.series[0]?.id ?? null
+    if (nav.selectedSeriesId === id) {
+      nav.selectedSeriesId = appState.series[0]?.id ?? null
+      nav.selectedEpisodeId = null
+      nav.openSeasonNumber = null
     }
   }
 
   function handleAddSeason(series: Series) {
     const nums = allSeasons(series).map(s => s.number)
     const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
-    pendingSeasonNumbers = [...pendingSeasonNumbers, next]
-    openSeasonNumber = next
+    nav.pendingSeasonNumbers = [...nav.pendingSeasonNumbers, next]
+    nav.openSeasonNumber = next
   }
 
   async function handleAddEpisode(seriesId: string, season: number, title: string) {
@@ -112,8 +121,8 @@
     const ep = await createEpisode(seriesId, season, num, title)
     if (ep) {
       appState = { ...appState, episodes: [...appState.episodes, ep] }
-      pendingSeasonNumbers = pendingSeasonNumbers.filter(n => n !== season)
-      selectedEpisodeId = ep.id
+      nav.pendingSeasonNumbers = nav.pendingSeasonNumbers.filter(n => n !== season)
+      nav.selectedEpisodeId = ep.id
     }
   }
 
@@ -153,21 +162,23 @@
   </div>
 
 {:else}
+  <div class="flex flex-col h-screen font-sans text-gray-900 bg-white">
+
   <!-- Demo mode banner -->
   {#if !isSupabaseConfigured}
-    <div class="bg-indigo-50 border-b border-indigo-200 text-indigo-700 text-xs text-center py-1 px-4">
+    <div class="bg-indigo-50 border-b border-indigo-200 text-indigo-700 text-xs text-center py-1 px-4 shrink-0">
       Demo-läge — data sparas inte, återställs vid omladdning
     </div>
   {/if}
 
   <!-- Realtime warning banner -->
   {#if isSupabaseConfigured && realtimeStatus !== 'SUBSCRIBED' && realtimeStatus !== 'CONNECTING'}
-    <div class="bg-yellow-50 border-b border-yellow-200 text-yellow-800 text-xs text-center py-1 px-4">
+    <div class="bg-yellow-50 border-b border-yellow-200 text-yellow-800 text-xs text-center py-1 px-4 shrink-0">
       Realtidsanslutning bruten ({realtimeStatus}) — data kan vara inaktuell
     </div>
   {/if}
 
-  <div class="flex h-screen overflow-hidden font-sans text-gray-900 bg-white">
+  <div class="flex flex-1 overflow-hidden">
 
     <!-- Series sidebar -->
     <aside class="w-64 shrink-0 border-r border-gray-200 flex flex-col gap-4 p-4">
@@ -180,9 +191,9 @@
         {#each appState.series as s (s.id)}
           <li class="flex items-center group">
             <button
-              onclick={() => { selectedSeriesId = s.id; selectedEpisodeId = null }}
+              onclick={() => { nav.selectedSeriesId = s.id; nav.selectedEpisodeId = null }}
               class="flex-1 text-left px-2 py-1.5 rounded text-sm transition-colors {
-                selectedSeriesId === s.id
+                nav.selectedSeriesId === s.id
                   ? 'bg-indigo-50 text-indigo-700 font-medium'
                   : 'hover:bg-gray-100 text-gray-700'
               }"
@@ -228,9 +239,9 @@
           <div class="flex gap-1 ml-auto">
             {#each ['track', 'stats'] as t (t)}
               <button
-                onclick={() => { activeTab = t as 'track' | 'stats' }}
+                onclick={() => { nav.activeTab = t as 'track' | 'stats' }}
                 class="px-3 py-1 rounded text-sm transition-colors {
-                  activeTab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  nav.activeTab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'
                 }"
               >
                 {t === 'track' ? 'Spåra' : 'Statistik'}
@@ -239,38 +250,38 @@
           </div>
         </div>
 
-        {#if activeTab === 'track'}
+        {#if nav.activeTab === 'track'}
           <div class="flex flex-1 overflow-hidden">
             <!-- Season / episode nav -->
-            <nav class="w-52 shrink-0 border-r border-gray-200 overflow-y-auto p-3 flex flex-col gap-3">
+            <nav class="w-52 shrink-0 border-r border-gray-200 overflow-y-auto p-3 flex flex-col gap-3" onclick={handleNavClick}>
               {#each allSeasons(selectedSeries) as season (season.id)}
                 {@const episodes = getEpisodesForSeason(appState, selectedSeries.id, season.number)}
-                {@const isOpen = openSeasonNumber === season.number}
+                {@const isOpen = nav.openSeasonNumber === season.number}
                 <div>
                   <button
-                    onclick={() => { openSeasonNumber = isOpen ? null : season.number }}
+                    data-season={season.number}
                     class="w-full flex items-center justify-between text-sm font-medium text-gray-700 hover:text-indigo-700 px-1 py-0.5"
                   >
                     <span>Säsong {season.number}</span>
                     <span class="text-gray-400">{isOpen ? '▾' : '▸'}</span>
                   </button>
 
-                  {#if isOpen}
-                    <ul class="mt-1 ml-2 flex flex-col gap-0.5">
-                      {#each episodes as ep (ep.id)}
-                        <li>
-                          <button
-                            onclick={() => { selectedEpisodeId = ep.id }}
-                            class="w-full text-left text-xs px-2 py-1 rounded transition-colors {
-                              selectedEpisodeId === ep.id
-                                ? 'bg-indigo-50 text-indigo-700'
-                                : 'text-gray-600 hover:bg-gray-100'
-                            }"
-                          >
-                            E{String(ep.number).padStart(2, '0')}{ep.title ? ` ${ep.title}` : ''}
-                          </button>
-                        </li>
-                      {/each}
+                  <ul class="mt-1 ml-2 flex flex-col gap-0.5 {isOpen ? '' : 'hidden'}">
+                    {#each episodes as ep (ep.id)}
+                      <li>
+                        <button
+                          data-epid={ep.id}
+                          class="w-full text-left text-xs px-2 py-1 rounded transition-colors {
+                            nav.selectedEpisodeId === ep.id
+                              ? 'bg-indigo-50 text-indigo-700'
+                              : 'text-gray-600 hover:bg-gray-100'
+                          }"
+                        >
+                          E{String(ep.number).padStart(2, '0')}{ep.title ? ` ${ep.title}` : ''}
+                        </button>
+                      </li>
+                    {/each}
+                    {#if isOpen}
                       <li>
                         <form
                           onsubmit={(e) => {
@@ -290,8 +301,8 @@
                           <button type="submit" class="px-1.5 text-xs rounded bg-gray-100 hover:bg-gray-200 text-gray-700">+</button>
                         </form>
                       </li>
-                    </ul>
-                  {/if}
+                    {/if}
+                  </ul>
                 </div>
               {/each}
 
@@ -305,16 +316,22 @@
 
             <!-- Tally panel -->
             <main class="flex-1 overflow-y-auto">
-              {#if selectedEpisode && openSeason}
-                <EpisodeView
-                  state={appState}
-                  season={openSeason}
-                  episode={selectedEpisode}
-                  onIncrement={handleIncrement}
-                  onDecrement={handleDecrement}
-                  onAddEventType={(name) => handleAddEventType(selectedSeries!.id, name)}
-                  onDeleteEventType={handleDeleteEventType}
-                />
+              {#if nav.selectedEpisodeId && nav.openSeasonNumber !== null}
+                {@const ep = appState.episodes.find(e => e.id === nav.selectedEpisodeId) ?? null}
+                {@const seas = selectedSeries ? (allSeasons(selectedSeries).find(s => s.number === nav.openSeasonNumber) ?? null) : null}
+                {#if ep && seas}
+                  <EpisodeView
+                    state={appState}
+                    season={seas}
+                    episode={ep}
+                    onIncrement={handleIncrement}
+                    onDecrement={handleDecrement}
+                    onAddEventType={(name) => handleAddEventType(selectedSeries!.id, name)}
+                    onDeleteEventType={handleDeleteEventType}
+                  />
+                {:else}
+                  <div class="p-6 text-sm text-gray-400 italic">Välj ett avsnitt för att börja spåra.</div>
+                {/if}
               {:else}
                 <div class="p-6 text-sm text-gray-400 italic">
                   Välj ett avsnitt för att börja spåra.
@@ -337,5 +354,6 @@
         </div>
       {/if}
     </div>
+  </div>
   </div>
 {/if}
