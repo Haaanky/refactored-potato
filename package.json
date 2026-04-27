@@ -1,41 +1,33 @@
 {
-  "name": "refactored-potato",
-  "private": true,
-  "version": "0.0.0",
+  "name": "tv-series-event-logger",
   "type": "module",
+  "version": "0.0.0",
+  "private": true,
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "lint": "eslint ."
   },
   "dependencies": {
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "@astrojs/svelte": "^7.0.4",
+    "@supabase/supabase-js": "^2.104.0",
+    "@tailwindcss/vite": "^4.2.4",
+    "astro": "^5.10.0",
+    "svelte": "^5.28.1",
+    "tailwindcss": "^4.2.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@tailwindcss/vite": "^4.2.4",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
+    "@testing-library/svelte": "^5.2.7",
     "@types/node": "^24.12.2",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
-    "@vitest/coverage-v8": "^4.1.5",
     "eslint": "^9.39.4",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
     "jsdom": "^29.0.2",
-    "tailwindcss": "^4.2.4",
-    "typescript": "~6.0.2",
+    "typescript": "~5.7.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.9",
     "vitest": "^4.1.5"
   }
 }
